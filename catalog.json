@@ -1,1 +1,34 @@
-["ocarina-of-time","minecraft","majoras-mask","happy-wheels","paper-mario-N64","mario-party-2-N64","kirby-64-the-crystal-shards-N64","tony-hawks-pro-skater-2-N64","banjo-kazooie-N64","star-fox-64-N64","diddy-kong-racing-N64","donkey-kong-64-N64","pokemon-stadium-N64","super-smash-bros-N64","goldeneye-007-N64","mario-kart-64-N64","super-mario-64-N64","the-legend-of-zelda-ocarina-of-time-N64","the-legend-of-zelda-majoras-mask-N64"]
+{
+  "channels": [],
+  "wiiware": [
+    "happy-wheels",
+    "majoras-mask",
+    "minecraft",
+    "ocarina-of-time"
+  ],
+  "virtual-console": {
+    "sega-genesis": [],
+    "ps1": [],
+    "nes": [],
+    "snes": [],
+    "n64": [
+      "diddy-kong-racing",
+      "donkey-kong-64",
+      "goldeneye-007",
+      "kirby-64-the-crystal-shards",
+      "mario-kart-64",
+      "mario-party-2",
+      "paper-mario",
+      "pokemon-stadium",
+      "star-fox-64",
+      "super-mario-64",
+      "super-smash-bros",
+      "the-legend-of-zelda-majoras-mask",
+      "the-legend-of-zelda-ocarina-of-time",
+      "tony-hawks-pro-skater-2"
+    ],
+    "gameboy": [],
+    "gameboy-color": [],
+    "gameboy-advance": []
+  }
+}
