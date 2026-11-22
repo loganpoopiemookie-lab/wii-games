@@ -1,0 +1,3 @@
+This system uses Gambatte, shared by Game Boy and Game Boy Color.
+The core data builds are stored once at ../../shared/cores/gambatte/.
+Use the included core-paths.js helper to map the build files for EmulatorJS.

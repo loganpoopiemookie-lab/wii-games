@@ -1,0 +1,38 @@
+[
+  {
+    "name": "fceumm",
+    "extensions": [
+      "fds",
+      "nes",
+      "unif",
+      "unf"
+    ],
+    "makeoptions": {
+      "buildpath": "./",
+      "makescript": "Makefile.libretro",
+      "arguments": []
+    },
+    "options": {},
+    "save": "srm",
+    "license": "Copying",
+    "repo": "https://github.com/EmulatorJS/libretro-fceumm"
+  },
+  {
+    "name": "nestopia",
+    "extensions": [
+      "fds",
+      "nes",
+      "unif",
+      "unf"
+    ],
+    "makeoptions": {
+      "buildpath": "./libretro",
+      "makescript": "Makefile",
+      "arguments": []
+    },
+    "options": {},
+    "save": "srm",
+    "license": "COPYING",
+    "repo": "https://github.com/EmulatorJS/nestopia"
+  }
+]
