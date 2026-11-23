@@ -1,5 +1,7 @@
 {
-  "channels": [],
+  "channels": [
+    "update-channel"
+  ],
   "wiiware": [
     "happy-wheels",
     "majoras-mask",

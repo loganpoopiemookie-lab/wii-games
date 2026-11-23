@@ -1,0 +1,273 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Update Channel</title>
+<style>
+  :root{--text:#222;--dim:#777;--bg:#fff;--row:#f3f3f3;--rowh:#ebebeb;--green:#2e8b3d;--orange:#c46a00;--red:#b3392f}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font:15px/1.4 system-ui,-apple-system,"Segoe UI",Arial,sans-serif}
+  .wrap{max-width:860px;margin:0 auto;padding:20px 16px 48px}
+  .bar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+  #summary{color:var(--dim)}
+  button{font:inherit;color:inherit;border:0;outline:0;background:var(--row);padding:7px 14px;border-radius:6px;cursor:pointer}
+  button:hover{background:var(--rowh)} button:disabled{opacity:.5;cursor:default}
+  h2{font-size:13px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--dim);margin:28px 0 8px}
+  .list{display:flex;flex-direction:column;gap:6px}
+  .row{display:flex;justify-content:space-between;gap:16px;background:var(--row);border-radius:8px;padding:12px 14px}
+  .row:hover{background:var(--rowh)}
+  .info{min-width:0}
+  .name{font-weight:600}
+  .tags{font-weight:400;color:var(--dim);margin-left:8px;font-size:13px}
+  .desc{color:var(--dim);font-size:13.5px}
+  .ver{font-size:13px;margin-top:3px;overflow-wrap:anywhere}
+  .side{flex:none;display:flex;flex-direction:column;align-items:flex-end;gap:6px;text-align:right}
+  .badge{font-size:13px;font-weight:600;color:var(--dim)}
+  .badge.ok{color:var(--green)} .badge.up{color:var(--orange)} .badge.err{color:var(--red)}
+  .links{display:flex;gap:12px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
+  .links a{color:var(--text);font-size:13.5px;text-decoration:underline;text-underline-offset:2px}
+  .links a:hover{color:#000;text-decoration-thickness:2px}
+  .links button{padding:3px 10px;font-size:13px;background:#e2e2e2}
+  .links button:hover{background:#d6d6d6}
+  a,button{outline:0}
+  @media (max-width:560px){.row{flex-direction:column;gap:8px}.side{align-items:flex-start;text-align:left}.links{justify-content:flex-start}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="bar"><span id="summary"></span><button id="refresh" type="button">Check for updates</button></div>
+  <main id="main"></main>
+</div>
+<script>
+(function () {
+  "use strict";
+
+  /* ------------------------------------------------------------------
+     What we track.
+       kind "release": newest GitHub release vs the version you have (installedVer)
+       kind "commit" : newest commit on the default branch vs the date you have (installedDate)
+     installedDate for the cores is when the cores in your emulator were built.
+     For projects you don't ship yet, it's the day they were added to this channel.
+     ------------------------------------------------------------------ */
+  var MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  var CORE_BUILD = "2025-06-14";
+  var ADDED = "2026-11-22";
+
+  var GROUPS = [
+    { title: "Emulator engine", items: [
+      { id: "emulatorjs", name: "EmulatorJS", tags: ["All systems"], repo: "EmulatorJS/EmulatorJS", kind: "release",
+        installedVer: "4.3.0-pre", installedLabel: "4.3.0-pre",
+        desc: "The player that runs every game in your emulators (menus, saves, controls).",
+        links: [["Website", "https://emulatorjs.org/"], ["Releases", "https://github.com/EmulatorJS/EmulatorJS/releases"]] }
+    ]},
+    { title: "Nintendo", items: [
+      core("fceumm", "FCEUmm", ["NES"], "libretro/libretro-fceumm", "Main NES core."),
+      core("nestopia", "Nestopia", ["NES"], "libretro/nestopia", "Alternate NES core."),
+      core("snes9x", "Snes9x", ["SNES"], "libretro/snes9x", "Main Super NES core."),
+      core("bsnes", "bsnes", ["SNES"], "libretro/bsnes", "Accurate Super NES core."),
+      core("mupen", "Mupen64Plus-Next", ["N64"], "libretro/mupen64plus-libretro-nx", "Main Nintendo 64 core."),
+      core("parallel", "ParaLLEl N64", ["N64"], "libretro/parallel-n64", "Alternate Nintendo 64 core."),
+      core("gambatte", "Gambatte", ["Game Boy", "Game Boy Color"], "libretro/gambatte-libretro", "Game Boy and Game Boy Color core."),
+      core("mgba", "mGBA", ["Game Boy Advance"], "mgba-emu/mgba", "Game Boy Advance core."),
+      core("melonds", "melonDS", ["Nintendo DS"], "libretro/melonDS", "Main Nintendo DS core."),
+      core("desmume", "DeSmuME", ["Nintendo DS"], "libretro/desmume", "Alternate Nintendo DS core."),
+      core("desmume2015", "DeSmuME 2015", ["Nintendo DS"], "libretro/desmume2015", "Older, lighter Nintendo DS core.")
+    ]},
+    { title: "Sony & Sega", items: [
+      core("pcsx", "PCSX ReARMed", ["PlayStation"], "libretro/pcsx_rearmed", "Fast PlayStation core."),
+      core("mednafen", "Beetle PSX HW", ["PlayStation"], "libretro/beetle-psx-libretro", "Accurate PlayStation core (mednafen_psx_hw)."),
+      core("genesis", "Genesis Plus GX", ["Sega Genesis"], "libretro/Genesis-Plus-GX", "Main Sega Genesis core."),
+      core("picodrive", "PicoDrive", ["Sega Genesis"], "libretro/picodrive", "Alternate Sega Genesis core.")
+    ]},
+    { title: "Nintendo 3DS", items: [
+      { id: "gaemboy", name: "Gaemboy 3DS Web", tags: ["Nintendo 3DS"], repo: "DomenicoGonnelli/gaemboy-3ds-web", kind: "commit",
+        installedDate: ADDED, installedLabel: "Watching since " + fmtDate(ADDED),
+        desc: "Azahar (3DS) compiled to WebAssembly + WebGL2, running in the browser.",
+        links: [["Open it", "https://domenicogonnelli.github.io/gaemboy-3ds-web/"], ["GitHub", "https://github.com/DomenicoGonnelli/gaemboy-3ds-web"], ["Commits", "https://github.com/DomenicoGonnelli/gaemboy-3ds-web/commits"]] },
+      { id: "azahar", name: "Azahar Web", tags: ["Nintendo 3DS"], repo: "SomeRandomFella/Azahar-Web", kind: "commit",
+        installedDate: ADDED, installedLabel: "Watching since " + fmtDate(ADDED),
+        desc: "A web port of the Azahar 3DS emulator, aiming for playable speed (40-60 fps).",
+        links: [["GitHub", "https://github.com/SomeRandomFella/Azahar-Web"], ["Commits", "https://github.com/SomeRandomFella/Azahar-Web/commits"]] }
+    ]},
+    { title: "Nintendo Switch", items: [
+      { id: "nxweb", name: "NX-Web", tags: ["Nintendo Switch"], repo: "Project-NX-Web/NX-Web", kind: "commit",
+        installedDate: ADDED, installedLabel: "Watching since " + fmtDate(ADDED),
+        desc: "Early scaffold exploring Switch emulation in the browser. Work in progress.",
+        links: [["GitHub", "https://github.com/Project-NX-Web/NX-Web"], ["Commits", "https://github.com/Project-NX-Web/NX-Web/commits"]] },
+      { id: "voland", name: "Voland", tags: ["Nintendo Switch"], repo: "voland-emu/Voland", kind: "commit",
+        installedDate: ADDED, installedLabel: "Watching since " + fmtDate(ADDED),
+        desc: "A Switch emulator for the web and everywhere else.",
+        links: [["GitHub", "https://github.com/voland-emu/Voland"], ["Commits", "https://github.com/voland-emu/Voland/commits"]] }
+    ]},
+    { title: "Wii, GameCube & PlayStation 2", items: [
+      { id: "dolphin", name: "wasm-dolphin", tags: ["GameCube", "Wii"], repo: "Remenby31/wasm-dolphin", kind: "commit",
+        installedDate: ADDED, installedLabel: "Watching since " + fmtDate(ADDED),
+        desc: "Dolphin running in a browser tab (WebAssembly). Run it locally from the repo.",
+        links: [["GitHub", "https://github.com/Remenby31/wasm-dolphin"], ["Commits", "https://github.com/Remenby31/wasm-dolphin/commits"]] },
+      { id: "tabstation", name: "TabStationToo", tags: ["PlayStation 2"], repo: "TabStationToo/TabStationToo", kind: "commit",
+        installedDate: ADDED, installedLabel: "Watching since " + fmtDate(ADDED),
+        desc: "PCSX2 in the browser. You bring your own BIOS. Works best in desktop Chrome or Edge.",
+        links: [["Open it", "https://tabstationtoo.github.io/TabStationToo/"], ["GitHub", "https://github.com/TabStationToo/TabStationToo"], ["Commits", "https://github.com/TabStationToo/TabStationToo/commits"]] }
+    ]}
+  ];
+
+  function core(id, name, tags, repo, desc) {
+    return { id: id, name: name, tags: tags, repo: repo, kind: "commit", installedDate: CORE_BUILD,
+      installedLabel: "Core built " + fmtDate(CORE_BUILD), upText: "New code upstream", desc: desc,
+      links: [["GitHub", "https://github.com/" + repo], ["Commits", "https://github.com/" + repo + "/commits"]] };
+  }
+
+  /* ---------- small helpers ---------- */
+  function fmtDate(s) {
+    var d = new Date(s); if (isNaN(d)) return "?";
+    return MONTHS[d.getUTCMonth()] + " " + d.getUTCDate() + ", " + d.getUTCFullYear();
+  }
+  function el(tag, cls, text) {
+    var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e;
+  }
+  var store = {
+    get: function (k) { try { return JSON.parse(localStorage.getItem("updch:" + k)); } catch (e) { return null; } },
+    set: function (k, v) { try { localStorage.setItem("updch:" + k, JSON.stringify(v)); } catch (e) {} }
+  };
+  /* "4.3.0-pre" -> [4,3,0,-1]; a pre-release sorts just below its release */
+  function ver(s) {
+    var m = String(s || "").replace(/^v/i, "").match(/^(\d+)(?:\.(\d+))?(?:\.(\d+))?(-.*)?/);
+    if (!m) return null;
+    return [+m[1], +(m[2] || 0), +(m[3] || 0), m[4] ? -1 : 0];
+  }
+  function cmp(a, b) { for (var i = 0; i < 4; i++) { if (a[i] !== b[i]) return a[i] < b[i] ? -1 : 1; } return 0; }
+
+  /* ---------- fetching ---------- */
+  var TTL = 30 * 60 * 1000;
+  function api(path, force) {
+    var key = "cache:" + path, c = store.get(key);
+    if (!force && c && Date.now() - c.t < TTL) return Promise.resolve(c.d);
+    return fetch("https://api.github.com" + path, { headers: { Accept: "application/vnd.github+json" } }).then(function (r) {
+      if (r.status === 403 || r.status === 429) throw new Error("GitHub's hourly limit was reached. Try again a bit later.");
+      if (r.status === 404) throw new Error("not-found");
+      if (!r.ok) throw new Error("GitHub answered " + r.status);
+      return r.json();
+    }).then(function (d) { store.set(key, { t: Date.now(), d: d }); return d; });
+  }
+  function check(item, force) {
+    if (item.kind === "release") {
+      return api("/repos/" + item.repo + "/releases/latest", force).then(function (r) {
+        return { tag: r.tag_name, date: r.published_at, url: r.html_url, text: r.name || r.tag_name };
+      });
+    }
+    return api("/repos/" + item.repo + "/commits?per_page=1", force).then(function (a) {
+      var c = a[0]; if (!c) throw new Error("no commits found");
+      return { tag: c.sha.slice(0, 7), date: c.commit.committer.date, url: c.html_url,
+               text: (c.commit.message || "").split("\n")[0] };
+    });
+  }
+  /* did something newer than what you have come out? */
+  function isNewer(item, latest) {
+    var ack = store.get("ack:" + item.id);
+    if (item.kind === "release") {
+      var base = ack ? ver(ack.tag) : ver(item.installedVer), now = ver(latest.tag);
+      if (base && now) return cmp(now, base) > 0;
+      return !ack || ack.tag !== latest.tag;
+    }
+    var since = ack ? new Date(ack.date) : new Date(item.installedDate + "T23:59:59Z");
+    return new Date(latest.date) > since;
+  }
+
+  /* ---------- drawing ---------- */
+  var cards = {};
+  function build() {
+    var main = document.getElementById("main");
+    GROUPS.forEach(function (g) {
+      main.appendChild(el("h2", null, g.title));
+      var list = el("div", "list"); main.appendChild(list);
+      g.items.forEach(function (it) {
+        var row = el("div", "row");
+        var info = el("div", "info");
+        var name = el("div", "name", it.name);
+        name.appendChild(el("span", "tags", it.tags.join(" · ")));
+        info.appendChild(name);
+        info.appendChild(el("div", "desc", it.desc));
+        var ver = el("div", "ver", ""); info.appendChild(ver);
+        row.appendChild(info);
+        var side = el("div", "side");
+        var badge = el("span", "badge", "Checking…"); side.appendChild(badge);
+        var links = el("div", "links");
+        it.links.forEach(function (l) {
+          var a = el("a", null, l[0]); a.href = l[1]; a.target = "_blank"; a.rel = "noopener noreferrer"; links.appendChild(a);
+        });
+        var ack = el("button", "ack", "Got it"); ack.type = "button"; ack.hidden = true;
+        links.appendChild(ack); side.appendChild(links);
+        row.appendChild(side);
+        list.appendChild(row);
+        cards[it.id] = { it: it, card: row, badge: badge, ver: ver, ack: ack, state: "load", have: "", latest: "" };
+      });
+    });
+  }
+
+  function haveText(it) {
+    var a = store.get("ack:" + it.id);
+    return a ? "Up to " + fmtDate(a.date) + " (" + a.tag + ")" : it.installedLabel;
+  }
+
+  function paint(c) {
+    c.ver.textContent = "You have: " + c.have + (c.latest ? "   ·   Newest: " + c.latest : "");
+  }
+  function show(id, latest, err) {
+    var c = cards[id], it = c.it;
+    c.have = haveText(it); c.ack.hidden = true;
+    if (err) {
+      c.state = "err"; c.badge.className = "badge err"; c.badge.textContent = "Couldn't check";
+      c.latest = err.message === "not-found" ? "not found on GitHub" : err.message;
+      paint(c); return;
+    }
+    c.latest = latest.tag + " · " + fmtDate(latest.date);
+    if (isNewer(it, latest)) {
+      c.state = "up"; c.badge.className = "badge up"; c.badge.textContent = it.upText || "Update available";
+      c.ack.hidden = false;
+      c.ack.onclick = function () { store.set("ack:" + it.id, { tag: latest.tag, date: latest.date }); show(id, latest); summarize(); };
+    } else {
+      c.state = "ok"; c.badge.className = "badge ok"; c.badge.textContent = "Up to date";
+    }
+    paint(c);
+  }
+
+  function summarize() {
+    var n = { up: 0, ok: 0, err: 0 };
+    Object.keys(cards).forEach(function (k) { var s = cards[k].state; if (n[s] != null) n[s]++; });
+    var t = n.up + " update" + (n.up === 1 ? "" : "s") + " available · " + n.ok + " up to date";
+    if (n.err) t += " · " + n.err + " couldn't be checked";
+    document.getElementById("summary").textContent = t;
+  }
+
+  function run(force) {
+    var btn = document.getElementById("refresh");
+    btn.disabled = true; btn.textContent = "Checking…";
+    Object.keys(cards).forEach(function (k) { cards[k].badge.className = "badge load"; cards[k].badge.textContent = "Checking…"; cards[k].state = "load"; });
+    var ids = Object.keys(cards), i = 0, active = 0, done = 0, limit = 4;
+    return new Promise(function (resolve) {
+      function next() {
+        while (active < limit && i < ids.length) {
+          (function (id) {
+            active++;
+            check(cards[id].it, force).then(function (l) { show(id, l); }, function (e) { show(id, null, e); })
+              .then(function () { active--; done++; summarize(); if (done === ids.length) resolve(); else next(); });
+          })(ids[i++]);
+        }
+      }
+      next();
+    }).then(function () {
+      btn.disabled = false; btn.textContent = "Check for updates";
+      
+    });
+  }
+
+  build();
+  Object.keys(cards).forEach(function (k) { cards[k].have = haveText(cards[k].it); paint(cards[k]); });
+  summarize();
+  document.getElementById("refresh").onclick = function () { run(true); };
+  run(false);
+})();
+</script>
+</body>
+</html>
