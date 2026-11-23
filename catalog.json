@@ -1299,10 +1299,15 @@
     "gamecube": [
       "animal-crossing",
       "mario-party-7",
-      "new-super-mario-bros-wii",
       "pokemon-box-ruby-sapphire",
       "the-legend-of-zelda-the-wind-waker",
       "the-legend-of-zelda-twilight-princess"
+    ],
+    "3ds": [
+      "new-super-mario-bros-2"
+    ],
+    "wii": [
+      "new-super-mario-bros-wii"
     ]
   }
 }
