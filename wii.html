@@ -582,7 +582,7 @@ const SHOPIMG={bag:'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAQAAAADACAYAAA
 /* ===== Wii Shop Channel ===== */
 const SHOP_BASE='https://raw.githubusercontent.com/loganpoopiemookie-lab/wii-games/main';   /* where catalog.json lives (no trailing slash); if you turn on GitHub Pages you can use 'https://loganpoopiemookie-lab.github.io/wii-games' instead */
 /* ===== version check: when a game on the SD Card is launched, compare this file with wii.html in the wii-games repo ===== */
-const WII_BUILD='2026-11-22-a';   /* change this whenever you change the file, so the copy in the repo and the copy people run can be told apart even when the page is opened from a local file */
+const WII_BUILD='2026-11-22-b';   /* change this whenever you change the file, so the copy in the repo and the copy people run can be told apart even when the page is opened from a local file */
 let wiiVerP=null;
 function wiiLatest(){return wiiVerP||(wiiVerP=(async()=>{   /* resolves true when the copy in the repo is NOT exactly this file */
   const r=await fetch(SHOP_BASE+'/wii.html',{cache:'no-cache'});if(!r.ok)throw new Error('no wii.html');const remote=await r.text();
@@ -593,7 +593,11 @@ function wiiVersionCheck(){wiiLatest().then(old=>{if(old)wiiOldWarn()}).catch(()
 function wiiOldWarn(){setTimeout(()=>sdAlert('Old Wii Menu',['Your on a old version of the wii menu,','if you want the best experience go to','https://github.com/loganpoopiemookie-lab/wii-games','and download the latest wii.html,','you wont lose any games or progress!'],16),700)}
 /* catalog sections: 'ch' = channels/, 'ww' = wiiware/, 'vc/<system>' = virtual-console/<system>/ */
 const SYS=[['sega-genesis','Sega Genesis','GENESIS','#26282b'],['ps1','PlayStation','PS1','#3f5fb8'],['nes','NES','NES','#c4392d'],['snes','Super NES','SNES','#7b62ad'],
-  ['n64','Nintendo 64','N64','#2f9e5a'],['gameboy','Game Boy','GB','#7f9160'],['gameboy-color','Game Boy Color','GBC','#8f49b0'],['gameboy-advance','Game Boy Advance','GBA','#4a52c4'],['ds','Nintendo DS','DS','#5b6268']];
+  ['n64','Nintendo 64','N64','#2f9e5a'],['gameboy','Game Boy','GB','#7f9160'],['gameboy-color','Game Boy Color','GBC','#8f49b0'],['gameboy-advance','Game Boy Advance','GBA','#4a52c4'],['ds','Nintendo DS','DS','#5b6268'],
+  /* experimental systems: tagged in the tile, and a warning pops up every time you open one (EXP_SYS) */
+  ['wii','Wii (Experimental)','WII','#4fa3d1'],['gamecube','GameCube (Experimental)','GC','#6a5acd'],['ps2','PS2 (Experimental)','PS2','#2c3e7a'],['3ds','3DS (Experimental)','3DS','#d2691e'],['switch','Switch (Experimental)','SWITCH','#e60012']];
+const EXP_SYS=['wii','gamecube','ps2','3ds','switch'];
+function shExpWarn(){sdAlert('Experimental',['This is very experimental, and will not run if','opened from a file:// dont even try, we cant','guarantee much support but most games do run,','and you will likely have to import your own roms','as these are more storage, and way less legal','than roms for stuff like nes or older consoles'],16)}
 const SHOP_CATALOG={};let shCatP=null;
 const shJ=u=>fetch(u,{cache:'no-cache'}).then(r=>{if(!r.ok)throw new Error('HTTP '+r.status);return r.json()});
 const shSysAll=()=>SYS.concat(Object.keys(SHOP_CATALOG).filter(k=>k.startsWith('vc/')&&!SYS.some(y=>'vc/'+y[0]===k)).map(k=>{const n=k.slice(3);return[n,n.replace(/-/g,' ').replace(/\b\w/g,c=>c.toUpperCase()),n.toUpperCase().slice(0,5),'#6b7479']}));
@@ -639,7 +643,8 @@ function shCards(sc,key,q){const L=SHOP_CATALOG[key]||[],ql=(q||'').trim().toLow
   V.forEach(([it,i],j)=>{const c=shEl(inn,'bb sb card',`left:${46+(j%4)*177}px;top:${12+Math.floor(j/4)*120}px`);c.dataset.a='det';c.dataset.g=key+':'+i;
     const im=document.createElement('img');im.src=it.icon;im.onerror=()=>{im.onerror=()=>{im.onerror=null;im.src=MISSING_IMG};im.src=it.titleImg};c.appendChild(im);shEl(c,'',null,it.title)})}
 const shBackTo=()=>{const [pg,arg]=shCur;if(pg==='det')return ['cat',String(arg).split(':')[0]];if(pg==='cat'&&String(arg).startsWith('vc/'))return ['sys'];return ['main']};
-async function shGo(pg,arg){shCur=[pg,arg];sh.replaceChildren();const p=shEl(sh,'shp','inset:0');
+async function shGo(pg,arg){const prevPg=shCur[0];shCur=[pg,arg];if(pg==='cat'&&prevPg==='sys'&&String(arg).startsWith('vc/')&&EXP_SYS.includes(String(arg).slice(3)))shExpWarn();   /* pressing an experimental system's tile */
+  sh.replaceChildren();const p=shEl(sh,'shp','inset:0');
   if(pg==='main'){shHead(p,'Wii Shop Channel');
     shTile(p,66,66,220,130,GAMEPAD,'Virtual Console','sys');
     shTile(p,306,66,220,130,'<div class="wware"><b>Wii</b><i>Ware.</i></div>','WiiWare','cat','ww',['Original Wii titles','available only here']);
