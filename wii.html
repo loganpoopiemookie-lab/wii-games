@@ -710,7 +710,7 @@ async function shAct(a,g){
     if(shPts()<it.points)return shSay('You do not have enough Wii Points.');
     {let free=Infinity;try{const e=await navigator.storage.estimate();if(e.quota)free=e.quota-(e.usage||0)}catch(e){}
       if(it.size>0&&free<it.size*1.1){shSay('Out of storage.');return sdStorageFull()}}
-    try{shSay('Downloading\u2026 0%');let blob,patched=false,rom=null;if(!it.zip&&it.sysId&&(EJS_SYS[it.sysId]||it.sysId==='gamecube'||it.sysId==='3ds'))rom=await shGetRom(it);if(rom){blob=rom.blob}else if(it.zip){blob=await shGetZip(it);patched=true}else{const plain=it.url.replace(/\.gz$/,''),order=it.gz?[plain+'.gz',plain]:[plain,plain+'.gz'];let r=null,used='';for(const u of order){try{const x=await fetch(u);if(x.ok){r=x;used=u;break}}catch(e){}}if(!r)throw new Error('game file not found (HTTP 404)');
+    try{shSay('Downloading\u2026 0%');let blob,patched=false,rom=null;if(!it.zip&&it.sysId&&(EJS_SYS[it.sysId]||it.sysId==='gamecube'||it.sysId==='wii'||it.sysId==='3ds'))rom=await shGetRom(it);if(rom){blob=rom.blob}else if(it.zip){blob=await shGetZip(it);patched=true}else{const plain=it.url.replace(/\.gz$/,''),order=it.gz?[plain+'.gz',plain]:[plain,plain+'.gz'];let r=null,used='';for(const u of order){try{const x=await fetch(u);if(x.ok){r=x;used=u;break}}catch(e){}}if(!r)throw new Error('game file not found (HTTP 404)');
       const total=+r.headers.get('content-length')||it.size||0,rd=r.body.getReader(),ch=[];let got=0;
       for(;;){const {done,value}=await rd.read();if(done)break;ch.push(value);got+=value.length;shSay('Downloading\u2026 '+(total?Math.min(99,Math.round(got/total*100))+'%':(got/1048576).toFixed(1)+' MB'))}
       blob=new Blob(ch);if(used.endsWith('.gz')){shSay('Unpacking\u2026');blob=await new Response(blob.stream().pipeThrough(new DecompressionStream('gzip'))).blob()}}
@@ -781,7 +781,7 @@ const EJS_SYS={'ps1':['psx','pcsx_rearmed'],'n64':['n64','mupen64plus_next'],'ds
   'gameboy':['gb','gambatte'],'gameboy-color':['gb','gambatte'],'gameboy-advance':['gba','mgba'],'sega-genesis':['segaMD','genesis_plus_gx']};
 /* ROM file extensions tried (in this order) for game/game.<ext>; zip / 7z are tried last */
 const EJS_EXT={'ps1':['chd','pbp','cue','iso','img','bin','m3u'],'n64':['z64','n64','v64'],'ds':['nds'],'nes':['nes','unf','unif'],'snes':['sfc','smc','fig','swc'],
-  'gameboy':['gb','gbc'],'gameboy-color':['gbc','gb'],'gameboy-advance':['gba'],'sega-genesis':['md','gen','smd','bin'],'gamecube':['rvz','iso','gcm'],'3ds':['3ds','cci','cxi','3dsx','app','elf']};
+  'gameboy':['gb','gbc'],'gameboy-color':['gbc','gb'],'gameboy-advance':['gba'],'sega-genesis':['md','gen','smd','bin'],'gamecube':['rvz','iso','gcm'],'wii':['wbfs','rvz','iso','gcm','wad'],'3ds':['3ds','cci','cxi','3dsx','app','elf']};
 /* core -> [folders inside cores/ to look in, uses the WebGL2 ("modern") build by default] */
 const EJS_CORE={desmume2015:[['ds'],1],melonds:[['ds'],1],desmume:[['ds'],1],fceumm:[['nes'],0],nestopia:[['nes'],0],gambatte:[['gameboy','gameboy_color','gambatte'],0],
   mgba:[['gameboy_advance'],0],snes9x:[['snes'],0],bsnes:[['snes'],0],mupen64plus_next:[['n64'],1],parallel_n64:[['n64'],0],
@@ -842,7 +842,7 @@ async function shGetRom(it){
   if(found.gz){shSay('Unpacking…');blob=await new Response(blob.stream().pipeThrough(new DecompressionStream('gzip'))).blob()}
   if(/\.zip$/i.test(name)&&it.sysId!=='ps1'){   /* a zipped ROM: unpack it here (fast, native) instead of inside the emulator; anything odd falls back to the emulator's own unzip */
     try{shSay('Unzipping…');const z=await shUnzip(blob,'',(EJS_EXT[it.sysId]||[]));blob=z.blob;name='game.'+z.ext}catch(e){}}
-  if(it.sysId==='gamecube')await gcPrepare(shSay);else if(it.sysId==='3ds')await tdsPrepare(shSay);else await ejsPrepare(it.sysId,{core:it.core,threads:it.threads,webgl2:it.webgl2},shSay,name.split('.').pop());   /* pre-fetches the core so the game starts offline */
+  if(it.sysId==='gamecube'||it.sysId==='wii')await gcPrepare(shSay,it.sysId);else if(it.sysId==='3ds')await tdsPrepare(shSay);else await ejsPrepare(it.sysId,{core:it.core,threads:it.threads,webgl2:it.webgl2},shSay,name.split('.').pop());   /* pre-fetches the core so the game starts offline */
   return{blob,name}}
 /* runs INSIDE the game iframe (its source is copied into the page by ejsPage). Waits for the menu to hand over the ROM + files,
    then boots EmulatorJS. EmulatorJS' downloadFile is hooked so cached files are used as they are instead of being fetched. */
@@ -890,19 +890,21 @@ function ejsPage(br){return '<!doctype html><html><head><meta charset="utf-8"><m
    Needs SharedArrayBuffer (cross-origin isolated page), so it never runs from file:// (see expOk). */
 const GC_FILES=['dolphin-core-upstream.js','dolphin-core-upstream.wasm','core.lock.json'];
 const GC_BASE='https://gamecube.wii.invalid/';   /* fake address of the game page: nothing is ever requested from it for real */
-let _gcA=null,_gcB=null;
+let _gcA=null,_gcB={};
 const gcUn=async b=>new Uint8Array(await new Response(new Blob([Uint8Array.from(atob(b),c=>c.charCodeAt(0))]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer());
 /* embedded part: {page: Dolphin's html, pack: [u32 json length][json {runtime, mods:[{p,o,l,x}]}][module sources]} */
 async function gcAssets(){if(_gcA)return _gcA;const J=JSON.parse(document.getElementById('gc-assets').textContent);
   return _gcA={page:new TextDecoder().decode(await gcUn(J.page)),pack:await gcUn(J.pack)}}
 /* downloads (once, then cached) the three core files -> {name: Blob} */
-async function gcPrepare(say){const o={};
-  for(let i=0;i<GC_FILES.length;i++){const n=GC_FILES[i],r=await ejsFile(['gamecube/'+n],pc=>say&&say('Downloading GameCube core ('+(i+1)+'/'+GC_FILES.length+')… '+pc));
-    if(!r)throw new Error('GameCube core not found: cores/gamecube/'+n+' is missing from the repo');o[n]=r.b}
-  return o}
+async function gcPrepare(say,dir){let d=dir==='wii'?'wii':'gamecube';const o={};
+  /* Wii uses cores/wii/; if that folder is not in the repo yet, the GameCube build of the same Dolphin core is used instead */
+  if(d==='wii'&&!(await ejsFile(['wii/'+GC_FILES[0]])))d='gamecube';
+  for(let i=0;i<GC_FILES.length;i++){const n=GC_FILES[i],r=await ejsFile([d+'/'+n],pc=>say&&say('Downloading '+(dir==='wii'?'Wii':'GameCube')+' core ('+(i+1)+'/'+GC_FILES.length+')\u2026 '+pc));
+    if(!r)throw new Error((dir==='wii'?'Wii':'GameCube')+' core not found: cores/'+d+'/'+n+' is missing from the repo');o[n]=r.b}
+  Object.defineProperty(o,'__dir',{value:d});return o}
 /* one blob: URL per module (the modules import each other through "@@MOD:path@@" placeholders), plus the prelude that every realm
    (page and every worker) imports first. The core is registered under cores/gamecube/ and cores/dolphin/ so either spelling works. */
-async function gcBoot(files){if(_gcB)return _gcB;
+async function gcBoot(files){const K=files.__dir||'gamecube';if(_gcB[K])return _gcB[K];
   const A=await gcAssets(),raw=A.pack,jl=new DataView(raw.buffer,raw.byteOffset).getUint32(0,true),dec=new TextDecoder(),
     idx=JSON.parse(dec.decode(raw.subarray(4,4+jl))),st=4+jl,mods={},data={},types={},
     U=(b,t)=>URL.createObjectURL(b instanceof Blob?b.slice(0,b.size,t):new Blob([b],{type:t})),
@@ -918,7 +920,7 @@ async function gcBoot(files){if(_gcB)return _gcB;
   both('cores/dolphin/dolphin-core-upstream.wasm').forEach(k=>{data[k]=wasm;types[k]='application/wasm'});
   const boot={base:GC_BASE,mods,data,types},
     prelude=URL.createObjectURL(new Blob(['globalThis.__VFS_BOOT='+JSON.stringify(boot)+';globalThis.__VFS_HREF='+JSON.stringify(GC_BASE+'dolphin.html')+';\n'+idx.runtime],{type:'text/javascript'}));
-  return _gcB={prelude,boot}}
+  return _gcB[K]={prelude,boot}}
 /* runs INSIDE the game iframe (copied into the page by gcPage). Waits for the menu to hand over the disc, boots Dolphin, keeps the
    loading screen up until clean mode has taken over, and wires the Wii menu keys. */
 function gcFrame(){
@@ -953,19 +955,20 @@ function gcFrame(){
       say(head+'\nReading the disc…');inp.dispatchEvent(new Event('change',{bubbles:true}))
     }).catch(function(e){fail('The GameCube emulator failed to start.\n'+(e&&e.message||e))})}
   parent.postMessage({wiiGcReady:1},'*')}
-function gcPage(A){return A.page.replace('<!--GCBOOT-->',()=>'<style>#gcLoad{position:fixed;inset:0;z-index:2147483000;background:#000;color:#fff;display:flex;align-items:center;justify-content:center;text-align:center;font:20px Arial,sans-serif;white-space:pre-wrap;padding:24px;box-sizing:border-box}#gcLoad.err{color:#ffb4b4}</style><div id="gcLoad"><div id="gcMsg">Loading GameCube…</div></div><script>('+gcFrame.toString()+')()<\/script>')}
+function gcPage(A,label){return A.page.replace('<!--GCBOOT-->',()=>'<style>#gcLoad{position:fixed;inset:0;z-index:2147483000;background:#000;color:#fff;display:flex;align-items:center;justify-content:center;text-align:center;font:20px Arial,sans-serif;white-space:pre-wrap;padding:24px;box-sizing:border-box}#gcLoad.err{color:#ffb4b4}</style><div id="gcLoad"><div id="gcMsg">Loading GameCube…</div></div><script>('+gcFrame.toString()+')()<\/script>').replace(/Loading GameCube\u2026/g,'Loading '+(label||'GameCube')+'\u2026')}
 /* the game page asks for its disc once it is up; the menu answers with a message (works the same from every kind of server) */
 let gcPend=null;
 addEventListener('message',e=>{const d=e.data;if(!d||!gcPend||e.source!==gcPend.f.contentWindow)return;
   if(d.wiiGcReady)e.source.postMessage({wiiGcRun:gcPend.run},'*');
   else if(d.wiiGcStarted&&hmOpen)try{e.source.postMessage({wiiPause:true},'*')}catch(x){}});
 async function gcLaunch(it,w,f){
-  const ld=shEl(w,'','position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#fff;font:20px Arial,sans-serif;text-align:center;padding:20px;white-space:pre-wrap','Loading GameCube…');
-  try{const files=await gcPrepare(t=>{ld.textContent=t}),B=await gcBoot(files),A=await gcAssets();if(!w.isConnected)return;
-    ld.textContent='Loading GameCube…';
+  const SYS=it.rom.sysId==='wii'?'Wii':'GameCube';
+  const ld=shEl(w,'','position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#fff;font:20px Arial,sans-serif;text-align:center;padding:20px;white-space:pre-wrap','Loading '+SYS+'…');
+  try{const files=await gcPrepare(t=>{ld.textContent=t},it.rom.sysId),B=await gcBoot(files),A=await gcAssets();if(!w.isConnected)return;
+    ld.textContent='Loading '+SYS+'…';
     gcPend={f,run:{prelude:B.prelude,boot:B.boot.mods['src/bootstrap.js'],clean:B.boot.mods['src/clean-mode.js'],rom:it.blob,
       romName:(String(it.id||it.title||'game').replace(/[^A-Za-z0-9._-]+/g,'_')||'game')+'.'+(it.rom.name.split('.').pop()||'iso')}};
-    f.srcdoc=gcPage(A);w.appendChild(f)}
+    f.srcdoc=gcPage(A,SYS);w.appendChild(f)}
   catch(e){ld.textContent='Could not start this game.\n'+(e&&e.message||e)}}
 /* ===== 3DS (Azahar, WebAssembly) =====
    3DS games are plain files (game/game.3ds, .cci, .cxi, .3dsx, .app, .elf) downloaded like the other Virtual Console ROMs.
@@ -1021,7 +1024,7 @@ async function shRun(it,from){
   if(shAud)shAud.T.forEach(x=>x.pause());
   const w=shEl(sh,'shgame','');shGame={w,from};document.body.classList.add('gaming');
   const f=document.createElement('iframe');f.setAttribute('allow','autoplay; fullscreen; gamepad; clipboard-write');
-  const cu=await wiiCursor(),br=shBr(cu);if(it.rom&&it.rom.sysId==='gamecube'){gcLaunch(it,w,f)}else if(it.rom&&it.rom.sysId==='3ds'){tdsLaunch(it,w,f,cu)}else if(it.rom){const ld=shEl(w,'','position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#fff;font:20px Arial,sans-serif;text-align:center;padding:20px;white-space:pre-wrap','Loading emulator\u2026');
+  const cu=await wiiCursor(),br=shBr(cu);if(it.rom&&(it.rom.sysId==='gamecube'||it.rom.sysId==='wii')){gcLaunch(it,w,f)}else if(it.rom&&it.rom.sysId==='3ds'){tdsLaunch(it,w,f,cu)}else if(it.rom){const ld=shEl(w,'','position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#fff;font:20px Arial,sans-serif;text-align:center;padding:20px;white-space:pre-wrap','Loading emulator\u2026');
     try{const P=await ejsPrepare(it.rom.sysId,it.rom,t=>{ld.textContent=t},it.rom.name.split('.').pop());if(!w.isConnected)return;
       console.log('[wii-emulator]',P.plan.core,P.plan.file,{threads:P.plan.threads,webgl2:P.plan.gl2,isolated:P.plan.caps.sab,mode:P.plan.mode});
       ejsPend={f,run:{rom:it.blob,romName:(String(it.id||it.title||'game').replace(/[^A-Za-z0-9._-]+/g,'_')||'game')+'.'+it.rom.name.split('.').pop(),name:it.title,plan:P.plan,files:P.files,base:EJS_BASE,biosUrl:it.rom.bios||''}};
